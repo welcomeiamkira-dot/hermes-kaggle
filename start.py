@@ -15,12 +15,24 @@ def sh(cmd):
     return subprocess.run(cmd, shell=True)
 
 
+import glob, shutil
+if subprocess.run("nvidia-smi -L", shell=True, capture_output=True).returncode != 0:
+    sys.exit("GPU nahi mila: Settings > Accelerator > GPU T4 x2 chuno, phir cell dobara chalao")
+NVCC = shutil.which("nvcc") or next(iter(sorted(glob.glob("/usr/local/cuda*/bin/nvcc"))), None)
+if not NVCC:
+    sys.exit("nvcc nahi mila (GPU image nahi hai?). Accelerator GPU T4 x2 rakho aur session restart karo")
+CUDA_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(NVCC)))
+os.environ["PATH"] = os.path.dirname(NVCC) + ":" + os.environ["PATH"]
+os.environ["CUDACXX"] = NVCC
+print("nvcc:", NVCC)
+
+
 # 1) llama.cpp build (background mein, download ke saath saath)
 build = None
 if not os.path.exists(SERVER):
     cmd = (
         f"rm -rf {LLAMA}; git clone --depth 1 https://github.com/ggml-org/llama.cpp {LLAMA} && cd {LLAMA} && "
-        "cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DLLAMA_CURL=OFF "
+        f"cmake -B build -DCMAKE_CUDA_COMPILER={NVCC} -DCUDAToolkit_ROOT={CUDA_ROOT} -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DLLAMA_CURL=OFF "
         "-DCUDA_cuda_driver_LIBRARY=/usr/local/nvidia/lib64/libcuda.so "
         "-DCMAKE_LIBRARY_PATH=/usr/local/nvidia/lib64 "
         "-DCMAKE_SHARED_LINKER_FLAGS=-L/usr/local/nvidia/lib64 "
