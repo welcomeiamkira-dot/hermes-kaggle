@@ -31,7 +31,7 @@ print("nvcc:", NVCC)
 build = None
 if not os.path.exists(SERVER):
     cmd = (
-        f"rm -rf {LLAMA}; git clone --depth 1 https://github.com/ggml-org/llama.cpp {LLAMA} && cd {LLAMA} && "
+        f"(test -d {LLAMA}/.git || (rm -rf {LLAMA}; git clone --depth 1 https://github.com/ggml-org/llama.cpp {LLAMA})) && cd {LLAMA} && "
         f"cmake -B build -DCMAKE_CUDA_COMPILER={NVCC} -DCUDAToolkit_ROOT={CUDA_ROOT} -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DLLAMA_CURL=OFF "
         "-DCUDA_cuda_driver_LIBRARY=/usr/local/nvidia/lib64/libcuda.so "
         "-DCMAKE_LIBRARY_PATH=/usr/local/nvidia/lib64 "
@@ -50,7 +50,13 @@ if not os.path.exists(MODEL):
 print("Model ready")
 
 if build is not None:
-    build.wait()
+    while build.poll() is None:
+        time.sleep(30)
+        try:
+            last = open("/tmp/build.log").read().strip().splitlines()[-1]
+        except Exception:
+            last = ""
+        print("build chal raha hai:", last[:90], flush=True)
     if not os.path.exists(SERVER):
         print(open("/tmp/build.log").read()[-1500:])
         sys.exit("Build fail hui, upar ka log bhejo")
